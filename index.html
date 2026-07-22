@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050714">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>The Name</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#050714;
+    --midnight:#0a0e27;
+    --midnight-light:#131a3d;
+    --star:#e8ecf7;
+    --star-dim:#6b7399;
+    --orb-core:#fffdf5;
+    --orb-warm:#ffe9b3;
+    --orb-gold:#ffb84d;
+    --glow-blue:#9fb4ff;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{
+    width:100%; height:100%; overflow:hidden;
+    background:var(--void);
+    font-family:'Inter', sans-serif;
+    touch-action:none;
+  }
+  #stage{
+    position:fixed; inset:0;
+    background:radial-gradient(ellipse at 50% 30%, var(--midnight-light) 0%, var(--midnight) 45%, var(--void) 100%);
+  }
+  canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+  #orb{
+    position:absolute;
+    width:40px; height:40px;
+    border-radius:50%;
+    left:0; top:0;
+    transform:translate(-50%,-50%) scale(0.001);
+    background:radial-gradient(circle,
+      var(--orb-core) 0%,
+      var(--orb-warm) 38%,
+      var(--orb-gold) 62%,
+      rgba(255,184,77,0) 100%);
+    opacity:0;
+    pointer-events:none;
+    will-change:transform, opacity;
+    filter:blur(0px);
+  }
+  #orb::before{
+    content:'';
+    position:absolute;
+    inset:-18%;
+    border-radius:50%;
+    background:radial-gradient(circle,
+      rgba(255,250,230,0.9) 0%,
+      rgba(255,205,120,0.45) 45%,
+      rgba(255,205,120,0) 75%);
+    mix-blend-mode:screen;
+    animation:breathe 5.5s ease-in-out infinite;
+  }
+  @keyframes breathe{
+    0%,100%{ opacity:0.5; transform:scale(0.96); }
+    50%{ opacity:0.85; transform:scale(1.05); }
+  }
+
+  #whiteout{
+    position:fixed; inset:0;
+    background:radial-gradient(circle at var(--ox) var(--oy), #ffffff 0%, #fff8e8 55%, #ffffff 100%);
+    opacity:0;
+    pointer-events:none;
+  }
+
+  #gate{
+    position:fixed; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:28px;
+    background:var(--void);
+    z-index:20;
+    text-align:center;
+    padding:40px;
+  }
+  #gate.hidden{ display:none; }
+  #gate h1{
+    font-family:'Cormorant Garamond', serif;
+    font-weight:300;
+    font-size:clamp(28px,7vw,40px);
+    color:var(--star);
+    letter-spacing:0.04em;
+  }
+  #gate p{
+    font-size:13px;
+    line-height:1.7;
+    color:var(--star-dim);
+    max-width:320px;
+    font-weight:300;
+  }
+  #begin{
+    margin-top:8px;
+    padding:14px 40px;
+    border-radius:999px;
+    border:1px solid rgba(232,236,247,0.25);
+    background:rgba(232,236,247,0.04);
+    color:var(--star);
+    font-family:'Cormorant Garamond', serif;
+    font-size:18px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  #begin:active{ background:rgba(232,236,247,0.12); }
+
+  .link-btn{
+    background:none; border:none;
+    color:var(--star-dim);
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+    letter-spacing:0.06em;
+    text-decoration:underline;
+    text-underline-offset:3px;
+    cursor:pointer;
+    padding:4px;
+  }
+
+  #voice-panel{
+    display:flex; flex-direction:column; align-items:stretch;
+    gap:14px;
+    width:100%; max-width:280px;
+    padding:16px;
+    border:1px solid rgba(232,236,247,0.12);
+    border-radius:12px;
+    background:rgba(232,236,247,0.03);
+  }
+  #voice-panel.hidden{ display:none; }
+  #voice-panel label{
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--star-dim);
+    display:block;
+    margin-bottom:6px;
+  }
+  #voice-select{
+    width:100%;
+    padding:8px 6px;
+    background:var(--midnight);
+    color:var(--star);
+    border:1px solid rgba(232,236,247,0.18);
+    border-radius:6px;
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+  }
+  .slider-row input[type="range"]{
+    width:100%;
+  }
+  #voice-test{
+    padding:8px;
+    border-radius:8px;
+    border:1px solid rgba(232,236,247,0.2);
+    background:transparent;
+    color:var(--star);
+    font-family:'Inter', sans-serif;
+    font-size:12px;
+    letter-spacing:0.04em;
+    cursor:pointer;
+  }
+  #voice-test:active{ background:rgba(232,236,247,0.1); }
+
+  #indicator{
+    position:fixed;
+    bottom:env(safe-area-inset-bottom, 24px);
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 16px;
+    z-index:10;
+    opacity:0.55;
+  }
+  #indicator .dot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--glow-blue);
+    animation:pulse 2.4s ease-in-out infinite;
+  }
+  #indicator span{
+    font-family:'Cormorant Garamond', serif;
+    font-size:12px;
+    letter-spacing:0.12em;
+    color:var(--star-dim);
+    text-transform:uppercase;
+  }
+  @keyframes pulse{
+    0%,100%{ opacity:0.35; transform:scale(1); }
+    50%{ opacity:1; transform:scale(1.4); }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    #indicator .dot{ animation:none; }
+    #orb::before{ animation:none; opacity:0.65; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="sky"></canvas>
+</div>
+
+<div id="orb"></div>
+<div id="whiteout" style="--ox:50%; --oy:50%;"></div>
+
+<div id="indicator">
+  <div class="dot"></div>
+  <span id="indicator-text">listening</span>
+</div>
+
+<div id="gate">
+  <h1>The Name</h1>
+  <p>
+    A single star waits in the dark. Speak <em>Yahweh</em>, <em>Ruach ha Kodesh</em>,
+    or <em>Yeshua</em> aloud, and He will rise to meet you. This needs your
+    microphone to listen, and a moment of sound to begin — Chrome asks
+    permission for both after you tap below.
+  </p>
+
+  <button type="button" id="voice-toggle" class="link-btn">Voice settings</button>
+  <div id="voice-panel" class="hidden">
+    <div>
+      <label for="voice-select">Voice</label>
+      <select id="voice-select"></select>
+    </div>
+    <div class="slider-row">
+      <label for="pitch-range">Pitch</label>
+      <input type="range" id="pitch-range" min="0.6" max="1.3" step="0.01">
+    </div>
+    <div class="slider-row">
+      <label for="rate-range">Pace</label>
+      <input type="range" id="rate-range" min="0.6" max="1.1" step="0.01">
+    </div>
+    <button type="button" id="voice-test">Hear a preview</button>
+  </div>
+
+  <button id="begin">Begin</button>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- starfield ----------
+  const canvas = document.getElementById('sky');
+  const ctx = canvas.getContext('2d');
+  let W, H, DPR;
+  let stars = [];
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    buildStars();
+  }
+
+  function buildStars(){
+    const count = Math.floor((W*H) / 6000);
+    stars = [];
+    for(let i=0;i<count;i++){
+      stars.push({
+        x: Math.random()*W,
+        y: Math.random()*H,
+        r: Math.random()*1.3 + 0.3,
+        phase: Math.random()*Math.PI*2,
+        speed: 0.4 + Math.random()*0.8,
+        baseAlpha: 0.35 + Math.random()*0.65
+      });
+    }
+    // pick a chosen star near center-ish for the theophany origin
+    chosenStar = stars[Math.floor(Math.random()*stars.length)] || {x:W/2,y:H*0.4};
+  }
+
+  let chosenStar = null;
+  let t0 = performance.now();
+
+  function drawSky(now){
+    ctx.clearRect(0,0,W,H);
+    const dt = (now - t0)/1000;
+    for(const s of stars){
+      let a = s.baseAlpha;
+      if(!reduceMotion){
+        a = s.baseAlpha * (0.55 + 0.45*Math.sin(dt*s.speed + s.phase));
+      }
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(232,236,247,${Math.max(0,a).toFixed(3)})`;
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    requestAnimationFrame(drawSky);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(drawSky);
+
+  // ---------- audio: synthesized rushing wind ----------
+  let audioCtx = null;
+
+  function ensureAudio(){
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function makeNoiseBuffer(seconds){
+    const rate = audioCtx.sampleRate;
+    const buf = audioCtx.createBuffer(1, rate*seconds, rate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i] = Math.random()*2 - 1;
+    return buf;
+  }
+
+  function playWind(durationMs){
+    ensureAudio();
+    const dur = durationMs/1000;
+    const now = audioCtx.currentTime;
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = makeNoiseBuffer(2);
+    src.loop = true;
+
+    const bandpass = audioCtx.createBiquadFilter();
+    bandpass.type = 'bandpass';
+    bandpass.Q.value = 0.7;
+    bandpass.frequency.setValueAtTime(180, now);
+    bandpass.frequency.linearRampToValueAtTime(900, now + dur*0.55);
+    bandpass.frequency.linearRampToValueAtTime(140, now + dur);
+
+    const lowpass = audioCtx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.setValueAtTime(2200, now);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.55, now + dur*0.16);
+    gain.gain.linearRampToValueAtTime(0.62, now + dur*0.55);
+    gain.gain.linearRampToValueAtTime(0.5, now + dur*0.75);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur*0.99);
+
+    src.connect(bandpass);
+    bandpass.connect(lowpass);
+    lowpass.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    src.start(now);
+    src.stop(now + dur + 0.05);
+  }
+
+  // ---------- spoken responses ----------
+  let cachedVoices = [];
+  function loadVoices(){
+    cachedVoices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+    populateVoiceSelect();
+  }
+  if('speechSynthesis' in window){
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+
+  function getVoiceSettings(){
+    let voiceName = '';
+    let pitch = 0.88;
+    let rate = 0.82;
+    try{
+      voiceName = localStorage.getItem('theophany_voice') || '';
+      const storedPitch = parseFloat(localStorage.getItem('theophany_pitch'));
+      const storedRate = parseFloat(localStorage.getItem('theophany_rate'));
+      if(!isNaN(storedPitch)) pitch = storedPitch;
+      if(!isNaN(storedRate)) rate = storedRate;
+    }catch(err){}
+    return { voiceName, pitch, rate };
+  }
+  function setVoiceSetting(key, value){
+    try{ localStorage.setItem('theophany_' + key, value); }catch(err){}
+  }
+
+  function pickVoice(){
+    const voices = cachedVoices.length ? cachedVoices : (window.speechSynthesis ? window.speechSynthesis.getVoices() : []);
+    if(!voices.length) return null;
+    const { voiceName } = getVoiceSettings();
+    if(voiceName){
+      const chosen = voices.find(v => v.name === voiceName);
+      if(chosen) return chosen;
+    }
+    const english = voices.filter(v => /^en/i.test(v.lang));
+    const pool = english.length ? english : voices;
+    const deepNames = /male|david|daniel|arthur|fred|google uk english male|guy/i;
+    return pool.find(v => deepNames.test(v.name)) || pool[0];
+  }
+
+  function populateVoiceSelect(){
+    const select = document.getElementById('voice-select');
+    if(!select || !cachedVoices.length) return;
+    const english = cachedVoices.filter(v => /^en/i.test(v.lang));
+    const pool = (english.length ? english : cachedVoices).slice().sort((a,b)=>a.name.localeCompare(b.name));
+    const { voiceName } = getVoiceSettings();
+    select.innerHTML = '';
+    pool.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.name;
+      opt.textContent = v.name + (v.lang ? ' (' + v.lang + ')' : '');
+      if(v.name === voiceName) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  function speakLine(text, {pitch, rate, volume=1, delayMs=0} = {}){
+    if(!('speechSynthesis' in window)) return;
+    const settings = getVoiceSettings();
+    const finalPitch = (pitch !== undefined) ? pitch : settings.pitch;
+    const finalRate = (rate !== undefined) ? rate : settings.rate;
+    const fire = () => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.pitch = finalPitch;
+      u.rate = finalRate;
+      u.volume = volume;
+      const v = pickVoice();
+      if(v) u.voice = v;
+      window.speechSynthesis.speak(u);
+    };
+    if(delayMs > 0){ setTimeout(fire, delayMs); } else { fire(); }
+  }
+
+  // ---------- optional recorded audio (used automatically if present) ----------
+  // Recordings used, placed in an /audio folder next to this file:
+  //   audio/youareminemychild.mp3  -> spoken for "Yahweh"
+  //   audio/yourpeace.mp3          -> spoken for "Yeshua" / "Jesus"
+  //   audio/breathoflife.mp3       -> spoken for "Ruach ha Kodesh", under the wind
+  // If a file isn't found, the built-in voice is used instead automatically.
+  function tryRecordingThenFallback(fileName, fallbackFn){
+    const url = 'audio/' + fileName;
+    fetch(url, { method:'HEAD' })
+      .then(res => {
+        if(res.ok){
+          const audio = new Audio(url);
+          audio.play().catch(fallbackFn);
+        } else {
+          fallbackFn();
+        }
+      })
+      .catch(fallbackFn);
+  }
+
+  // Yahweh: the voice alone, deep and unhurried
+  function respondYahweh(){
+    setTimeout(() => {
+      tryRecordingThenFallback('youareminemychild.mp3', () => {
+        speakLine('I am here, my child.', { volume:1 });
+      });
+    }, 900);
+  }
+
+  // Yeshua / Jesus: rich and warm
+  function respondYeshua(){
+    setTimeout(() => {
+      tryRecordingThenFallback('yourpeace.mp3', () => {
+        speakLine('I am here, and I am your peace.', { volume:1 });
+      });
+    }, 900);
+  }
+
+  // Ruach ha Kodesh: the wind, with the same words carried lightly inside it
+  function respondRuach(durationMs){
+    playWind(durationMs);
+    const settings = getVoiceSettings();
+    const airyPitch = Math.min(settings.pitch + 0.42, 2.0);
+    const airyRate = Math.min(settings.rate + 0.1, 1.3);
+    setTimeout(() => {
+      tryRecordingThenFallback('breathoflife.mp3', () => {
+        speakLine('I am here, my child.', { pitch:airyPitch, rate:airyRate, volume:0.32 });
+      });
+    }, 1900);
+  }
+
+  // ---------- speech recognition ----------
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+  let listeningEnabled = false;
+  const indicatorText = document.getElementById('indicator-text');
+
+  function startRecognition(){
+    if(!SpeechRecognition){
+      indicatorText.textContent = 'voice unsupported';
+      return;
+    }
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = function(e){
+      for(let i=e.resultIndex; i<e.results.length; i++){
+        const transcript = e.results[i][0].transcript.toLowerCase();
+        if(/ruach.*kodesh/.test(transcript)){
+          triggerTheophany('ruach'); break;
+        } else if(/yeshua|jesus/.test(transcript)){
+          triggerTheophany('yeshua'); break;
+        } else if(/yahweh/.test(transcript)){
+          triggerTheophany('yahweh'); break;
+        }
+      }
+    };
+
+    recognition.onerror = function(e){
+      // 'no-speech' and 'aborted' are routine on Android; just restart.
+    };
+
+    recognition.onend = function(){
+      if(listeningEnabled && !animating){
+        try{ recognition.start(); }catch(err){}
+      } else if(listeningEnabled && animating){
+        // will be restarted when animation ends
+      }
+    };
+
+    try{ recognition.start(); }catch(err){}
+  }
+
+  // ---------- the theophany animation ----------
+  const orb = document.getElementById('orb');
+  const whiteout = document.getElementById('whiteout');
+  let animating = false;
+
+  function easeInOutCubic(x){
+    return x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x+2,3)/2;
+  }
+  function easeInExpo(x){
+    return x === 0 ? 0 : Math.pow(2, 10*x - 10);
+  }
+
+  function triggerTheophany(mode){
+    if(animating) return;
+    animating = true;
+    indicatorText.textContent = '';
+
+    const origin = chosenStar || {x:W/2, y:H*0.4};
+    orb.style.left = origin.x + 'px';
+    orb.style.top = origin.y + 'px';
+    whiteout.style.setProperty('--ox', (origin.x/W*100) + '%');
+    whiteout.style.setProperty('--oy', (origin.y/H*100) + '%');
+
+    const diag = Math.sqrt(W*W + H*H);
+    const maxScale = (diag / 40) * 1.35;
+
+    const total = 10000;
+
+    if(mode === 'yeshua'){
+      respondYeshua();
+    } else if(mode === 'ruach'){
+      respondRuach(total);
+    } else {
+      respondYahweh();
+    }
+
+    const start = performance.now();
+
+    function frame(now){
+      const elapsed = now - start;
+      const p = Math.min(elapsed/total, 1);
+
+      if(p < 0.10){
+        // ignition: the chosen star catches light
+        const ip = p/0.10;
+        orb.style.opacity = ip.toString();
+        orb.style.transform = `translate(-50%,-50%) scale(${0.06 + ip*0.25})`;
+      } else if(p < 0.55){
+        // growth: the fire spreads to fill the screen
+        const gp = (p-0.10)/0.45;
+        const eased = easeInExpo(gp);
+        const scale = 0.3 + eased * (maxScale - 0.3);
+        orb.style.opacity = '1';
+        orb.style.transform = `translate(-50%,-50%) scale(${scale})`;
+        const whiteRise = Math.max(0, (gp-0.66)/0.34);
+        whiteout.style.opacity = (whiteRise * 0.95).toString();
+      } else if(p < 0.75){
+        // bloom: brilliant white fire holds, filling the whole screen
+        orb.style.transform = `translate(-50%,-50%) scale(${maxScale})`;
+        whiteout.style.opacity = '1';
+      } else {
+        // the fire has passed into you — a slow, gentle fade back to the stars
+        const fp = (p-0.75)/0.25;
+        const eased = easeInOutCubic(fp);
+        orb.style.transform = `translate(-50%,-50%) scale(${maxScale})`;
+        orb.style.opacity = (1 - eased).toString();
+        whiteout.style.opacity = (1 - eased).toString();
+      }
+
+      if(elapsed < total){
+        requestAnimationFrame(frame);
+      } else {
+        orb.style.opacity = '0';
+        orb.style.transform = 'translate(-50%,-50%) scale(0.001)';
+        whiteout.style.opacity = '0';
+        buildStars();
+        animating = false;
+        indicatorText.textContent = 'listening';
+        if(listeningEnabled && recognition){
+          try{ recognition.start(); }catch(err){}
+        }
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- permission gate ----------
+  const voiceToggle = document.getElementById('voice-toggle');
+  const voicePanel = document.getElementById('voice-panel');
+  const voiceSelect = document.getElementById('voice-select');
+  const pitchRange = document.getElementById('pitch-range');
+  const rateRange = document.getElementById('rate-range');
+  const voiceTest = document.getElementById('voice-test');
+
+  const initialSettings = getVoiceSettings();
+  pitchRange.value = initialSettings.pitch;
+  rateRange.value = initialSettings.rate;
+
+  voiceToggle.addEventListener('click', function(){
+    voicePanel.classList.toggle('hidden');
+  });
+  voiceSelect.addEventListener('change', function(){
+    setVoiceSetting('voice', voiceSelect.value);
+  });
+  pitchRange.addEventListener('input', function(){
+    setVoiceSetting('pitch', pitchRange.value);
+  });
+  rateRange.addEventListener('input', function(){
+    setVoiceSetting('rate', rateRange.value);
+  });
+  voiceTest.addEventListener('click', function(){
+    ensureAudio();
+    speakLine('I am here, my child.', {});
+  });
+
+  document.getElementById('begin').addEventListener('click', function(){
+    ensureAudio();
+    // quick silent unlock blip for iOS/Android autoplay policies
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    g.gain.value = 0;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + 0.05);
+
+    if('speechSynthesis' in window){
+      const warm = new SpeechSynthesisUtterance(' ');
+      warm.volume = 0;
+      window.speechSynthesis.speak(warm);
+      loadVoices();
+    }
+
+    listeningEnabled = true;
+    startRecognition();
+    document.getElementById('gate').classList.add('hidden');
+  });
+
+  // long-press anywhere on the sky = manual trigger, for testing without voice
+  // cycles through the three responses on successive long-presses
+  const testModes = ['yahweh', 'ruach', 'yeshua'];
+  let testModeIndex = 0;
+  let pressTimer = null;
+  document.getElementById('stage').addEventListener('touchstart', function(){
+    pressTimer = setTimeout(function(){
+      triggerTheophany(testModes[testModeIndex]);
+      testModeIndex = (testModeIndex + 1) % testModes.length;
+    }, 900);
+  });
+  document.getElementById('stage').addEventListener('touchend', function(){
+    clearTimeout(pressTimer);
+  });
+
+})();
+</script>
+</body>
+</html>
