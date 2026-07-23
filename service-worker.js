@@ -1,4 +1,4 @@
-const CACHE_NAME = 'the-name-v1';
+const CACHE_NAME = 'the-name-v2';
 
 const CORE_ASSETS = [
   './',
