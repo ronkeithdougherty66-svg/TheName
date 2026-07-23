@@ -643,13 +643,29 @@
   //   audio/yourpeace.mp3          -> spoken for "Yeshua" / "Jesus"
   //   audio/breathoflife.mp3       -> spoken for "Ruach ha Kodesh", under the wind
   // If a file isn't found, the built-in voice is used instead automatically.
-  function tryRecordingThenFallback(fileName, fallbackFn){
+  function playRecordingFile(url, gainMultiplier){
+    ensureAudio();
+    const audio = new Audio(url);
+    if(gainMultiplier && gainMultiplier !== 1){
+      try{
+        const source = audioCtx.createMediaElementSource(audio);
+        const boost = audioCtx.createGain();
+        boost.gain.value = gainMultiplier;
+        source.connect(boost);
+        boost.connect(audioCtx.destination);
+      }catch(err){
+        // if routing fails for any reason, it still plays at normal volume
+      }
+    }
+    return audio.play();
+  }
+
+  function tryRecordingThenFallback(fileName, fallbackFn, gainMultiplier){
     const url = 'audio/' + fileName;
     fetch(url, { method:'HEAD' })
       .then(res => {
         if(res.ok){
-          const audio = new Audio(url);
-          audio.play().catch(fallbackFn);
+          playRecordingFile(url, gainMultiplier).catch(fallbackFn);
         } else {
           fallbackFn();
         }
@@ -686,7 +702,7 @@
     setTimeout(() => {
       tryRecordingThenFallback('breathoflife.mp3', () => {
         speakLine('I am here, my child.', { pitch:airyPitch, rate:airyRate, volume:0.32 });
-      });
+      }, 1.3);
     }, voiceDelayMs);
   }
 
