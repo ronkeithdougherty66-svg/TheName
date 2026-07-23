@@ -510,7 +510,7 @@
     return buf;
   }
 
-  function playWind(durationMs){
+  function playWind(durationMs, voiceStartMs, voiceEndMs){
     ensureAudio();
     const dur = durationMs/1000;
     const now = audioCtx.currentTime;
@@ -531,11 +531,27 @@
     lowpass.frequency.setValueAtTime(2200, now);
 
     const gain = audioCtx.createGain();
+    const peak = 0.26;
+    const duckLevel = 0.045;
+
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.55, now + dur*0.16);
-    gain.gain.linearRampToValueAtTime(0.62, now + dur*0.55);
-    gain.gain.linearRampToValueAtTime(0.5, now + dur*0.75);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur*0.99);
+
+    if(voiceStartMs !== undefined && voiceEndMs !== undefined && voiceEndMs > voiceStartMs){
+      const vs = Math.max(voiceStartMs/1000, 0.5);
+      const ve = Math.min(voiceEndMs/1000, dur - 1.0);
+      const attackEnd = Math.min(Math.max(vs - 0.3, 0.4), vs - 0.05);
+
+      gain.gain.exponentialRampToValueAtTime(peak, now + attackEnd);
+      gain.gain.linearRampToValueAtTime(duckLevel, now + vs);
+      gain.gain.setValueAtTime(duckLevel, now + ve);
+      gain.gain.linearRampToValueAtTime(peak * 0.85, now + Math.min(ve + 0.8, dur - 0.3));
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur - 0.1);
+    } else {
+      gain.gain.exponentialRampToValueAtTime(peak, now + dur*0.16);
+      gain.gain.linearRampToValueAtTime(peak, now + dur*0.55);
+      gain.gain.linearRampToValueAtTime(peak*0.85, now + dur*0.75);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur*0.99);
+    }
 
     src.connect(bandpass);
     bandpass.connect(lowpass);
@@ -661,7 +677,9 @@
 
   // Ruach ha Kodesh: the wind, with the same words carried lightly inside it
   function respondRuach(durationMs){
-    playWind(durationMs);
+    const voiceDelayMs = 1900;
+    const voiceLengthEstimateMs = 5450; // measured length of breathoflife.mp3
+    playWind(durationMs, voiceDelayMs, voiceDelayMs + voiceLengthEstimateMs);
     const settings = getVoiceSettings();
     const airyPitch = Math.min(settings.pitch + 0.42, 2.0);
     const airyRate = Math.min(settings.rate + 0.1, 1.3);
@@ -669,7 +687,7 @@
       tryRecordingThenFallback('breathoflife.mp3', () => {
         speakLine('I am here, my child.', { pitch:airyPitch, rate:airyRate, volume:0.32 });
       });
-    }, 1900);
+    }, voiceDelayMs);
   }
 
   // ---------- speech recognition ----------
