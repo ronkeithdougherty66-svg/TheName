@@ -531,8 +531,8 @@
     lowpass.frequency.setValueAtTime(2200, now);
 
     const gain = audioCtx.createGain();
-    const peak = 0.13;
-    const duckLevel = 0.018;
+    const peak = 0.07;
+    const duckLevel = 0.008;
 
     gain.gain.setValueAtTime(0.0001, now);
 
@@ -643,29 +643,13 @@
   //   audio/yourpeace.mp3          -> spoken for "Yeshua" / "Jesus"
   //   audio/breathoflife.mp3       -> spoken for "Ruach ha Kodesh", under the wind
   // If a file isn't found, the built-in voice is used instead automatically.
-  function playRecordingFile(url, gainMultiplier){
-    ensureAudio();
-    const audio = new Audio(url);
-    if(gainMultiplier && gainMultiplier !== 1){
-      try{
-        const source = audioCtx.createMediaElementSource(audio);
-        const boost = audioCtx.createGain();
-        boost.gain.value = gainMultiplier;
-        source.connect(boost);
-        boost.connect(audioCtx.destination);
-      }catch(err){
-        // if routing fails for any reason, it still plays at normal volume
-      }
-    }
-    return audio.play();
-  }
-
-  function tryRecordingThenFallback(fileName, fallbackFn, gainMultiplier){
+  function tryRecordingThenFallback(fileName, fallbackFn){
     const url = 'audio/' + fileName;
     fetch(url, { method:'HEAD' })
       .then(res => {
         if(res.ok){
-          playRecordingFile(url, gainMultiplier).catch(fallbackFn);
+          const audio = new Audio(url);
+          audio.play().catch(fallbackFn);
         } else {
           fallbackFn();
         }
@@ -702,7 +686,7 @@
     setTimeout(() => {
       tryRecordingThenFallback('breathoflife.mp3', () => {
         speakLine('I am here, my child.', { pitch:airyPitch, rate:airyRate, volume:0.32 });
-      }, 1.3);
+      });
     }, voiceDelayMs);
   }
 
