@@ -258,6 +258,39 @@
     text-align:center;
     transition:opacity 0.4s ease;
   }
+
+  #manual-triggers{
+    position:fixed;
+    right:env(safe-area-inset-right, 14px);
+    top:50%;
+    transform:translateY(-50%);
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    z-index:10;
+  }
+  .manual-btn{
+    min-height:44px;
+    padding:8px 12px;
+    border-radius:10px;
+    border:1px solid rgba(232,236,247,0.16);
+    background:rgba(232,236,247,0.03);
+    color:var(--star-dim);
+    font-family:'Cormorant Garamond', serif;
+    font-size:13px;
+    letter-spacing:0.04em;
+    text-align:right;
+    cursor:pointer;
+    opacity:0.6;
+    transition:opacity 0.25s ease, background 0.25s ease, color 0.25s ease;
+    max-width:104px;
+  }
+  .manual-btn:active{
+    opacity:1;
+    background:rgba(232,236,247,0.1);
+    color:var(--star);
+  }
+  .manual-btn.hidden{ display:none; }
   .checkbox-row{
     display:flex;
     align-items:center;
@@ -307,6 +340,12 @@
     <span id="indicator-text">listening</span>
   </div>
   <div id="heard-text"></div>
+</div>
+
+<div id="manual-triggers">
+  <button type="button" class="manual-btn" data-mode="yahweh">Yahweh</button>
+  <button type="button" class="manual-btn" data-mode="ruach">Ruach ha Kodesh</button>
+  <button type="button" class="manual-btn" data-mode="yeshua">Yeshua</button>
 </div>
 
 <div id="gate">
@@ -758,6 +797,13 @@
   try{ diagToggle.checked = (localStorage.getItem('theophany_diag') === '1'); }catch(err){}
   diagToggle.addEventListener('change', function(){
     try{ localStorage.setItem('theophany_diag', diagToggle.checked ? '1' : '0'); }catch(err){}
+  });
+
+  document.querySelectorAll('.manual-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      ensureAudio();
+      triggerTheophany(btn.getAttribute('data-mode'));
+    });
   });
 
   document.getElementById('begin').addEventListener('click', function(){
