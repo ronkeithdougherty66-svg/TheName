@@ -335,6 +335,44 @@
     color:var(--star);
   }
   .manual-btn.hidden{ display:none; }
+  .trigger-divider{
+    height:1px;
+    background:rgba(232,236,247,0.14);
+    margin:2px 6px;
+  }
+
+  #scripture-overlay{
+    position:fixed;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    padding:14vw;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 1.2s ease;
+    z-index:8;
+  }
+  #scripture-ref{
+    font-family:'Cormorant Garamond', serif;
+    font-size:14px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--glow-blue);
+  }
+  #scripture-text{
+    font-family:'Cormorant Garamond', serif;
+    font-weight:300;
+    font-style:italic;
+    font-size:clamp(20px, 4.4vw, 30px);
+    line-height:1.6;
+    text-align:center;
+    color:var(--star);
+    text-shadow:0 0 18px rgba(10,14,39,0.9);
+    max-width:640px;
+  }
   .checkbox-row{
     display:flex;
     align-items:center;
@@ -397,6 +435,13 @@
   <button type="button" class="manual-btn" data-mode="yahweh">Yahweh</button>
   <button type="button" class="manual-btn" data-mode="ruach">Ruach ha Kodesh</button>
   <button type="button" class="manual-btn" data-mode="yeshua">Yeshua</button>
+  <div class="trigger-divider"></div>
+  <button type="button" id="scripture-btn" class="manual-btn">Scripture</button>
+</div>
+
+<div id="scripture-overlay">
+  <div id="scripture-ref"></div>
+  <div id="scripture-text"></div>
 </div>
 
 <div id="gate">
@@ -638,21 +683,30 @@
   }
 
   // ---------- optional recorded audio (used automatically if present) ----------
-  // Recordings used, placed in an /audio folder next to this file:
-  //   audio/youareminemychild.mp3  -> spoken for "Yahweh"
-  //   audio/yourpeace.mp3          -> spoken for "Yeshua" / "Jesus"
-  //   audio/breathoflife.mp3       -> spoken for "Ruach ha Kodesh", under the wind
-  // If a file isn't found, the built-in voice is used instead automatically.
-  function tryRecordingThenFallback(fileName, fallbackFn){
-    const url = 'audio/' + fileName;
-    fetch(url, { method:'HEAD' })
-      .then(res => {
-        if(res.ok){
-          const audio = new Audio(url);
-          audio.play().catch(fallbackFn);
-        } else {
-          fallbackFn();
-        }
+  // Recordings go in an /audio folder next to this file. Each name can have
+  // up to 5 variants — the original filename, plus up to 4 more with a
+  // number prefix — and one is chosen at random each time that name is
+  // triggered. Only the files that actually exist are considered, so you
+  // can add variants gradually; nothing breaks if only one file is present.
+  //   audio/youareminemychild.mp3, audio/1-youareminemychild.mp3, ... 4-  -> "Yahweh"
+  //   audio/yourpeace.mp3, audio/1-yourpeace.mp3, ... 4-                 -> "Yeshua" / "Jesus"
+  //   audio/breathoflife.mp3, audio/1-breathoflife.mp3, ... 4-           -> "Ruach ha Kodesh"
+  // If none of a name's files are found, the built-in voice is used instead.
+  const AUDIO_VARIANTS = {
+    yahweh: ['youareminemychild.mp3', '1-youareminemychild.mp3', '2-youareminemychild.mp3', '3-youareminemychild.mp3', '4-youareminemychild.mp3'],
+    yeshua: ['yourpeace.mp3', '1-yourpeace.mp3', '2-yourpeace.mp3', '3-yourpeace.mp3', '4-yourpeace.mp3'],
+    ruach:  ['breathoflife.mp3', '1-breathoflife.mp3', '2-breathoflife.mp3', '3-breathoflife.mp3', '4-breathoflife.mp3']
+  };
+
+  function playRandomRecording(fileNames, fallbackFn){
+    const urls = fileNames.map(f => 'audio/' + f);
+    Promise.all(urls.map(u => fetch(u, { method:'HEAD' }).then(r => r.ok ? u : null).catch(() => null)))
+      .then(results => {
+        const valid = results.filter(Boolean);
+        if(valid.length === 0){ fallbackFn(); return; }
+        const chosen = valid[Math.floor(Math.random() * valid.length)];
+        const audio = new Audio(chosen);
+        audio.play().catch(fallbackFn);
       })
       .catch(fallbackFn);
   }
@@ -660,7 +714,7 @@
   // Yahweh: the voice alone, deep and unhurried
   function respondYahweh(){
     setTimeout(() => {
-      tryRecordingThenFallback('youareminemychild.mp3', () => {
+      playRandomRecording(AUDIO_VARIANTS.yahweh, () => {
         speakLine('I am here, my child.', { volume:1 });
       });
     }, 900);
@@ -669,7 +723,7 @@
   // Yeshua / Jesus: rich and warm
   function respondYeshua(){
     setTimeout(() => {
-      tryRecordingThenFallback('yourpeace.mp3', () => {
+      playRandomRecording(AUDIO_VARIANTS.yeshua, () => {
         speakLine('I am here, and I am your peace.', { volume:1 });
       });
     }, 900);
@@ -684,11 +738,91 @@
     const airyPitch = Math.min(settings.pitch + 0.42, 2.0);
     const airyRate = Math.min(settings.rate + 0.1, 1.3);
     setTimeout(() => {
-      tryRecordingThenFallback('breathoflife.mp3', () => {
+      playRandomRecording(AUDIO_VARIANTS.ruach, () => {
         speakLine('I am here, my child.', { pitch:airyPitch, rate:airyRate, volume:0.32 });
       });
     }, voiceDelayMs);
   }
+
+  // ---------- scripture ----------
+  // Loaded from scriptures.txt, placed next to this file. Format: plain text,
+  // each entry is a reference on its own line, then the verse text on the
+  // line(s) after it, with one blank line between entries. Example:
+  //
+  //   John 3:16
+  //   For God so loved the world, that he gave his only begotten Son...
+  //
+  //   Psalm 23:1
+  //   The LORD is my shepherd; I shall not want.
+  //
+  // If the file isn't present yet, the Scripture button quietly does nothing.
+  let scriptureVerses = [];
+
+  function loadScriptures(){
+    fetch('scriptures.txt')
+      .then(res => res.ok ? res.text() : Promise.reject())
+      .then(text => {
+        const blocks = text.replace(/\r\n/g, '\n').split(/\n\s*\n/);
+        scriptureVerses = blocks.map(block => {
+          const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+          if(lines.length < 2) return null;
+          return { ref: lines[0], text: lines.slice(1).join(' ') };
+        }).filter(Boolean);
+      })
+      .catch(() => { /* file not uploaded yet — button will simply do nothing */ });
+  }
+  loadScriptures();
+
+  const scriptureOverlay = document.getElementById('scripture-overlay');
+  const scriptureRefEl = document.getElementById('scripture-ref');
+  const scriptureTextEl = document.getElementById('scripture-text');
+
+  function playScripture(){
+    if(animating) return;
+    if(!scriptureVerses.length) return;
+    animating = true;
+    indicatorText.textContent = '';
+
+    const verse = scriptureVerses[Math.floor(Math.random() * scriptureVerses.length)];
+    scriptureRefEl.textContent = verse.ref;
+    scriptureTextEl.textContent = verse.text;
+    scriptureOverlay.style.opacity = '1';
+
+    const finish = () => {
+      setTimeout(() => {
+        scriptureOverlay.style.opacity = '0';
+        setTimeout(() => {
+          scriptureRefEl.textContent = '';
+          scriptureTextEl.textContent = '';
+          animating = false;
+          indicatorText.textContent = 'listening';
+          if(listeningEnabled && recognition){
+            try{ recognition.start(); }catch(err){}
+          }
+        }, 1300);
+      }, 3000);
+    };
+
+    if('speechSynthesis' in window){
+      const settings = getVoiceSettings();
+      const utter = new SpeechSynthesisUtterance(verse.ref + '. ' + verse.text);
+      utter.pitch = settings.pitch;
+      utter.rate = settings.rate;
+      utter.volume = 1;
+      const v = pickVoice();
+      if(v) utter.voice = v;
+      utter.onend = finish;
+      utter.onerror = finish;
+      window.speechSynthesis.speak(utter);
+    } else {
+      finish();
+    }
+  }
+
+  document.getElementById('scripture-btn').addEventListener('click', function(){
+    ensureAudio();
+    playScripture();
+  });
 
   // ---------- speech recognition ----------
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -868,7 +1002,7 @@
     try{ localStorage.setItem('theophany_diag', diagToggle.checked ? '1' : '0'); }catch(err){}
   });
 
-  document.querySelectorAll('.manual-btn').forEach(function(btn){
+  document.querySelectorAll('.manual-btn[data-mode]').forEach(function(btn){
     btn.addEventListener('click', function(){
       ensureAudio();
       triggerTheophany(btn.getAttribute('data-mode'));

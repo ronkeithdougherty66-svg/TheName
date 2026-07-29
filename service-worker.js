@@ -1,12 +1,25 @@
-const CACHE_NAME = 'the-name-v2';
+const CACHE_NAME = 'the-name-v3';
 
 const CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './scriptures.txt',
   './audio/youareminemychild.mp3',
+  './audio/1-youareminemychild.mp3',
+  './audio/2-youareminemychild.mp3',
+  './audio/3-youareminemychild.mp3',
+  './audio/4-youareminemychild.mp3',
   './audio/yourpeace.mp3',
+  './audio/1-yourpeace.mp3',
+  './audio/2-yourpeace.mp3',
+  './audio/3-yourpeace.mp3',
+  './audio/4-yourpeace.mp3',
   './audio/breathoflife.mp3',
+  './audio/1-breathoflife.mp3',
+  './audio/2-breathoflife.mp3',
+  './audio/3-breathoflife.mp3',
+  './audio/4-breathoflife.mp3',
   './icons/icon-48.png',
   './icons/icon-72.png',
   './icons/icon-96.png',
