@@ -317,15 +317,15 @@
     min-height:44px;
     padding:8px 12px;
     border-radius:10px;
-    border:1px solid rgba(232,236,247,0.16);
-    background:rgba(232,236,247,0.03);
+    border:1px solid rgba(232,236,247,0.2);
+    background:rgba(232,236,247,0.04);
     color:var(--star-dim);
     font-family:'Cormorant Garamond', serif;
     font-size:13px;
     letter-spacing:0.04em;
     text-align:right;
     cursor:pointer;
-    opacity:0.6;
+    opacity:0.72;
     transition:opacity 0.25s ease, background 0.25s ease, color 0.25s ease;
     max-width:104px;
   }
@@ -805,7 +805,7 @@
 
     if('speechSynthesis' in window){
       const settings = getVoiceSettings();
-      const utter = new SpeechSynthesisUtterance(verse.ref + '. ' + verse.text);
+      const utter = new SpeechSynthesisUtterance(verse.text);
       utter.pitch = settings.pitch;
       utter.rate = settings.rate;
       utter.volume = 1;
