@@ -341,6 +341,33 @@
     margin:2px 6px;
   }
 
+  #scripture-categories{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    justify-content:flex-end;
+    max-width:130px;
+  }
+  #scripture-categories.hidden{ display:none; }
+  .category-chip{
+    padding:4px 10px;
+    border-radius:999px;
+    border:1px solid rgba(232,236,247,0.2);
+    background:rgba(232,236,247,0.03);
+    color:var(--star-dim);
+    font-family:'Inter', sans-serif;
+    font-size:10px;
+    letter-spacing:0.03em;
+    cursor:pointer;
+    opacity:0.65;
+  }
+  .category-chip.selected{
+    opacity:1;
+    color:var(--star);
+    border-color:rgba(159,180,255,0.55);
+    background:rgba(159,180,255,0.14);
+  }
+
   #scripture-overlay{
     position:fixed;
     inset:0;
@@ -354,6 +381,10 @@
     pointer-events:none;
     transition:opacity 1.2s ease;
     z-index:8;
+  }
+  #scripture-overlay.active{
+    pointer-events:auto;
+    cursor:pointer;
   }
   #scripture-ref{
     font-family:'Cormorant Garamond', serif;
@@ -437,6 +468,7 @@
   <button type="button" class="manual-btn" data-mode="yeshua">Yeshua</button>
   <div class="trigger-divider"></div>
   <button type="button" id="scripture-btn" class="manual-btn">Scripture</button>
+  <div id="scripture-categories" class="hidden"></div>
 </div>
 
 <div id="scripture-overlay">
@@ -770,8 +802,19 @@
   //   Psalm 23:1
   //   The LORD is my shepherd; I shall not want.
   //
-  // If the file isn't present yet, the Scripture button quietly does nothing.
+  // Optional: add tags in brackets at the end of the reference line to sort
+  // verses into categories, e.g.:
+  //
+  //   Psalm 23:1 [comfort, peace]
+  //   The LORD is my shepherd; I shall not want.
+  //
+  // A verse can have several tags, comma-separated. Untagged verses still
+  // work fine and just appear under "All". If the file isn't present yet,
+  // the Scripture button quietly does nothing.
   let scriptureVerses = [];
+  let scriptureTags = [];
+  let selectedCategory = 'all';
+  try{ selectedCategory = localStorage.getItem('theophany_scripture_category') || 'all'; }catch(err){}
 
   function loadScriptures(){
     fetch('scriptures.txt')
@@ -781,47 +824,118 @@
         scriptureVerses = blocks.map(block => {
           const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
           if(lines.length < 2) return null;
-          return { ref: lines[0], text: lines.slice(1).join(' ') };
+          let refLine = lines[0];
+          let tags = [];
+          const tagMatch = refLine.match(/\[([^\]]+)\]\s*$/);
+          if(tagMatch){
+            tags = tagMatch[1].split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+            refLine = refLine.slice(0, tagMatch.index).trim();
+          }
+          return { ref: refLine, text: lines.slice(1).join(' '), tags };
         }).filter(Boolean);
+        scriptureTags = Array.from(new Set(scriptureVerses.flatMap(v => v.tags))).sort();
+        renderCategoryChips();
       })
       .catch(() => { /* file not uploaded yet — button will simply do nothing */ });
   }
   loadScriptures();
 
+  function getFilteredVerses(){
+    if(selectedCategory === 'all') return scriptureVerses;
+    const filtered = scriptureVerses.filter(v => v.tags.includes(selectedCategory));
+    return filtered.length ? filtered : scriptureVerses;
+  }
+
+  function renderCategoryChips(){
+    const container = document.getElementById('scripture-categories');
+    if(!container) return;
+    if(scriptureTags.length === 0){ container.classList.add('hidden'); return; }
+    container.classList.remove('hidden');
+    container.innerHTML = '';
+    const makeChip = (label, value) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'category-chip' + (value === selectedCategory ? ' selected' : '');
+      chip.textContent = label;
+      chip.addEventListener('click', function(){
+        selectedCategory = value;
+        try{ localStorage.setItem('theophany_scripture_category', value); }catch(err){}
+        renderCategoryChips();
+      });
+      container.appendChild(chip);
+    };
+    makeChip('All', 'all');
+    scriptureTags.forEach(tag => makeChip(tag.charAt(0).toUpperCase() + tag.slice(1), tag));
+  }
+
   const scriptureOverlay = document.getElementById('scripture-overlay');
   const scriptureRefEl = document.getElementById('scripture-ref');
   const scriptureTextEl = document.getElementById('scripture-text');
+  let currentVerse = null;
+  let scriptureFadeTimer = null;
+  let scriptureClearTimer = null;
+  let scriptureSpeechToken = 0;
 
-  function playScripture(){
-    if(animating) return;
-    if(!scriptureVerses.length) return;
-    animating = true;
-    indicatorText.textContent = '';
+  // Speaks a verse in short punctuation-paced segments, at a slightly
+  // slower, more deliberate pace than the name responses use.
+  function speakScriptureText(text){
+    scriptureSpeechToken++;
+    const myToken = scriptureSpeechToken;
+    if(!('speechSynthesis' in window)) return;
 
-    const verse = scriptureVerses[Math.floor(Math.random() * scriptureVerses.length)];
+    const settings = getVoiceSettings();
+    const rate = Math.max(0.55, Math.min(settings.rate * 0.8, 1.1));
+    const pitch = settings.pitch;
+    const voice = pickVoice();
+
+    const segments = (text.match(/[^.,;:!?]+[.,;:!?]?/g) || [text]).map(s => s.trim()).filter(Boolean);
+
+    function speakIndex(i){
+      if(myToken !== scriptureSpeechToken) return;
+      if(i >= segments.length) return;
+      const seg = segments[i];
+      const u = new SpeechSynthesisUtterance(seg);
+      u.rate = rate; u.pitch = pitch; u.volume = 1;
+      if(voice) u.voice = voice;
+      const endsSentence = /[.;:!?]$/.test(seg);
+      const endsComma = /,$/.test(seg);
+      const pause = endsComma ? 260 : (endsSentence ? 480 : 200);
+      const advance = () => {
+        if(myToken !== scriptureSpeechToken) return;
+        setTimeout(() => speakIndex(i + 1), pause);
+      };
+      u.onend = advance;
+      u.onerror = advance;
+      window.speechSynthesis.speak(u);
+    }
+    speakIndex(0);
+  }
+
+  function showVerse(verse){
+    clearTimeout(scriptureFadeTimer);
+    clearTimeout(scriptureClearTimer);
+    scriptureSpeechToken++; // invalidate any in-flight speech chain
+    if('speechSynthesis' in window){ window.speechSynthesis.cancel(); }
+
+    currentVerse = verse;
     scriptureRefEl.textContent = verse.ref;
     scriptureTextEl.textContent = verse.text;
     scriptureOverlay.style.opacity = '1';
+    scriptureOverlay.classList.add('active');
 
-    if('speechSynthesis' in window){
-      const settings = getVoiceSettings();
-      const utter = new SpeechSynthesisUtterance(verse.text);
-      utter.pitch = settings.pitch;
-      utter.rate = settings.rate;
-      utter.volume = 1;
-      const v = pickVoice();
-      if(v) utter.voice = v;
-      window.speechSynthesis.speak(utter);
-    }
+    speakScriptureText(verse.text);
 
     // text stays on screen for a fixed 12 seconds, independent of how
     // long the reading takes, then fades back to the starfield
-    setTimeout(() => {
+    scriptureFadeTimer = setTimeout(() => {
+      scriptureSpeechToken++;
       if('speechSynthesis' in window){ window.speechSynthesis.cancel(); }
       scriptureOverlay.style.opacity = '0';
-      setTimeout(() => {
+      scriptureOverlay.classList.remove('active');
+      scriptureClearTimer = setTimeout(() => {
         scriptureRefEl.textContent = '';
         scriptureTextEl.textContent = '';
+        currentVerse = null;
         animating = false;
         indicatorText.textContent = 'listening';
         if(listeningEnabled && recognition){
@@ -830,6 +944,20 @@
       }, 1300);
     }, 12000);
   }
+
+  function playScripture(){
+    if(animating) return;
+    const pool = getFilteredVerses();
+    if(!pool.length) return;
+    animating = true;
+    indicatorText.textContent = '';
+    showVerse(pool[Math.floor(Math.random() * pool.length)]);
+  }
+
+  // tapping the verse itself while it's showing reads it again, unhurried
+  scriptureOverlay.addEventListener('click', function(){
+    if(currentVerse) showVerse(currentVerse);
+  });
 
   document.getElementById('scripture-btn').addEventListener('click', function(){
     ensureAudio();
